@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/ngthdong/gobalancer/internal/balancer"
+	"github.com/ngthdong/gobalancer/internal/config"
 	"github.com/ngthdong/gobalancer/internal/pool"
 )
 
@@ -14,8 +15,28 @@ type TCPProxy struct {
 	balancer balancer.Balancer
 }
 
-func NewTCPProxy(p *pool.BackendPool, b balancer.Balancer) *TCPProxy {
+func NewTCPProxy(p *pool.BackendPool, b balancer.Balancer, cfg *config.Config) *TCPProxy {
 	return &TCPProxy{pool: p, balancer: b}
+}
+
+func (p *TCPProxy) ListenAndServe(addr string) error {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+
+	log.Printf("TCP proxy listening on %s", addr)
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("accept error: %v", err)
+			continue
+		}
+
+		go p.HandleConn(conn)
+	}
 }
 
 func (p *TCPProxy) HandleConn(client net.Conn) {

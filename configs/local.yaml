@@ -1,0 +1,22 @@
+listen_addr: ":8008"
+mode: http
+
+backends:
+  - "localhost:9001"
+  - "localhost:9002"
+  - "localhost:9003"
+
+timeouts:
+  dial:  5s
+  read:  30s
+  write: 30s
+  idle:  90s
+
+health:
+  interval: 10s
+  timeout:  2s
+  path:     "/health"
+
+log:
+  level:  info
+  format: text
