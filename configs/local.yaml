@@ -16,6 +16,8 @@ health:
   interval: 10s
   timeout:  2s
   path:     "/health"
+  failure_threshold: 2
+  success_threshold: 1
 
 log:
   level:  info

@@ -7,7 +7,6 @@ import (
 	"github.com/ngthdong/gobalancer/internal/pool"
 )
 
-// balancer/roundrobin_test.go
 func TestRoundRobinDistribution(t *testing.T) {
 	backends := []*pool.Backend{
 		pool.NewBackend("a:1"),
