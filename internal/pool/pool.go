@@ -28,7 +28,7 @@ func (p *BackendPool) Backends() []*Backend {
 	result := make([]*Backend, len(p.backends))
 	copy(result, p.backends)
 	return result
-}	
+}
 
 func (p *BackendPool) Drain(ctx context.Context, addr string, logger *slog.Logger) error {
 	p.mu.RLock()

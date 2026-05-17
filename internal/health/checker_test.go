@@ -1,4 +1,4 @@
-package health_test 
+package health_test
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func TestHealthCheckerMarksUnhealthy(t *testing.T) {
 	backend := pool.NewBackend(ln.Addr().String())
 	strategy := &health.TCPChecker{}
 	cfg := config.HealthConfig{
-		Interval:         50 * time.Millisecond, 
+		Interval:         50 * time.Millisecond,
 		Timeout:          100 * time.Millisecond,
 		FailureThreshold: 1,
 	}

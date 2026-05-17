@@ -31,7 +31,7 @@ func TestLeastConnSkipsUnhealthy(t *testing.T) {
 	unhealthy.SetHealthy(false)
 
 	unhealthy.TrackConn(0)
-	healthy.TrackConn(100) 
+	healthy.TrackConn(100)
 
 	lc := &balancer.LeastConnections{}
 	picked := lc.Next([]*pool.Backend{unhealthy, healthy})

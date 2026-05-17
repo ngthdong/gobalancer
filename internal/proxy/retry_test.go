@@ -37,7 +37,7 @@ func TestRetryingTransport_RetriesTransportError(t *testing.T) {
 
 		return &http.Response{
 			StatusCode: 200,
-			Body: io.NopCloser(strings.NewReader("ok")),
+			Body:       io.NopCloser(strings.NewReader("ok")),
 		}, nil
 	})
 
@@ -137,13 +137,13 @@ func TestRetryingTransport_RetriesOn5xx(t *testing.T) {
 		if attempts == 1 {
 			return &http.Response{
 				StatusCode: 503,
-				Body: io.NopCloser(strings.NewReader("bad")),
+				Body:       io.NopCloser(strings.NewReader("bad")),
 			}, nil
 		}
 
 		return &http.Response{
 			StatusCode: 200,
-			Body: io.NopCloser(strings.NewReader("ok")),
+			Body:       io.NopCloser(strings.NewReader("ok")),
 		}, nil
 	})
 
@@ -251,7 +251,7 @@ func TestRetryingTransport_UsesDifferentBackendAfterFailure(t *testing.T) {
 
 		return &http.Response{
 			StatusCode: 200,
-			Body: io.NopCloser(strings.NewReader("ok")),
+			Body:       io.NopCloser(strings.NewReader("ok")),
 		}, nil
 	})
 

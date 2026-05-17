@@ -47,7 +47,7 @@ func classifyError(err error) (statusCode int, kind string) {
 	}
 
 	if errors.Is(err, context.Canceled) {
-		return 499, "client_closed" 
+		return 499, "client_closed"
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {

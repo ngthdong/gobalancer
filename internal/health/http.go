@@ -18,7 +18,7 @@ func NewHTTPChecker(timeout time.Duration, path string) *HTTPChecker {
 		client: &http.Client{
 			Timeout: timeout,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse 
+				return http.ErrUseLastResponse
 			},
 		},
 		path: path,

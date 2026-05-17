@@ -43,7 +43,7 @@ func NewHTTPProxy(
 			// Only set the scheme so ReverseProxy doesn't reject the request,
 			// and append X-Forwarded-For if the client hasn't set it already.
 			req.URL.Scheme = "http"
-			req.URL.Host = "placeholder" 
+			req.URL.Host = "placeholder"
 			if req.Header.Get("X-Forwarded-For") == "" {
 				req.Header.Set("X-Forwarded-For", req.RemoteAddr)
 			}

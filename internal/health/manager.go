@@ -2,8 +2,8 @@ package health
 
 import (
 	"context"
-	"sync"
 	"log/slog"
+	"sync"
 
 	"github.com/ngthdong/gobalancer/internal/config"
 	"github.com/ngthdong/gobalancer/internal/pool"
@@ -39,7 +39,7 @@ func (m *Manager) Start(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, c := range m.checkers {
 		wg.Add(1)
-		c := c 
+		c := c
 		go func() {
 			defer wg.Done()
 			c.Run(ctx)

@@ -17,9 +17,9 @@ type Checker struct {
 }
 
 func NewChecker(
-	b *pool.Backend, 
-	strategy CheckStrategy, 
-	cfg config.HealthConfig, 
+	b *pool.Backend,
+	strategy CheckStrategy,
+	cfg config.HealthConfig,
 	logger *slog.Logger,
 ) *Checker {
 	return &Checker{
@@ -65,7 +65,7 @@ func (c *Checker) runCheck(ctx context.Context) {
 	if !isHealthy {
 		failures := c.backend.ConsecutiveFailures() + 1
 		if failures < int32(c.cfg.FailureThreshold) {
-			c.backend.SetHealthy(false) 
+			c.backend.SetHealthy(false)
 			c.logger.Debug("health check failed, not yet at threshold",
 				"failures", failures,
 				"threshold", c.cfg.FailureThreshold,

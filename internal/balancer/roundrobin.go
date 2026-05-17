@@ -33,25 +33,25 @@ func (rr *RoundRobin) Next(backends []*pool.Backend) *pool.Backend {
 }
 
 func (rr *RoundRobin) NextExcluding(
-    backends []*pool.Backend,
-    exclude map[string]struct{},
+	backends []*pool.Backend,
+	exclude map[string]struct{},
 ) *pool.Backend {
-    if len(backends) == 0 {
-        return nil
-    }
+	if len(backends) == 0 {
+		return nil
+	}
 
-    healthy := make([]*pool.Backend, 0, len(backends))
-    for _, b := range backends {
-        if b.IsHealthy() {
-            if _, excluded := exclude[b.Addr]; !excluded {
-                healthy = append(healthy, b)
-            }
-        }
-    }
-    if len(healthy) == 0 {
-        return nil
-    }
+	healthy := make([]*pool.Backend, 0, len(backends))
+	for _, b := range backends {
+		if b.IsHealthy() {
+			if _, excluded := exclude[b.Addr]; !excluded {
+				healthy = append(healthy, b)
+			}
+		}
+	}
+	if len(healthy) == 0 {
+		return nil
+	}
 
-    idx := rr.counter.Add(1) - 1
-    return healthy[idx%uint64(len(healthy))]
+	idx := rr.counter.Add(1) - 1
+	return healthy[idx%uint64(len(healthy))]
 }
