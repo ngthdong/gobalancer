@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/ngthdong/gobalancer/internal/balancer"
 	"github.com/ngthdong/gobalancer/internal/config"
+	"github.com/ngthdong/gobalancer/internal/health"
 	"github.com/ngthdong/gobalancer/internal/middleware"
 	"github.com/ngthdong/gobalancer/internal/pool"
 	"github.com/ngthdong/gobalancer/internal/proxy"
@@ -32,6 +34,11 @@ func (s *Server) Run() error {
 		"listen", s.cfg.ListenAddr,
 		"backends", s.cfg.Backends,
 	)
+
+	ctx := context.Background()
+
+	hm := health.NewManager(s.pool.Backends(),*s.cfg, s.logger)
+	hm.Start(ctx)
 
 	switch s.cfg.Mode {
 	case "http":

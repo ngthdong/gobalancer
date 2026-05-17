@@ -103,7 +103,7 @@ func (c *Config) applyDefaults() {
 		c.Balancer = "round_robin"
 	}
 	if c.Health.Path == "" {
-		c.Health.Path = "/health"
+		c.Health.Path = "/"
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"

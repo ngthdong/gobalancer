@@ -14,9 +14,9 @@ timeouts:
   idle:  90s
 
 health:
-  interval: 10s
+  interval: 5s
   timeout:  2s
-  path:     "/health"
+  path:     "/"
   failure_threshold: 2
   success_threshold: 1
 

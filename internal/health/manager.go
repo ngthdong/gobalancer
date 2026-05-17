@@ -17,19 +17,18 @@ type Manager struct {
 func NewManager(
 	backends []*pool.Backend,
 	config config.Config,
-	healthConfig config.HealthConfig,
 	logger *slog.Logger,
 ) *Manager {
 	var strategy CheckStrategy
 	if config.Mode == "http" {
-		strategy = NewHTTPChecker(healthConfig.Timeout, healthConfig.Path)
+		strategy = NewHTTPChecker(config.Health.Timeout, config.Health.Path)
 	} else {
 		strategy = &TCPChecker{}
 	}
 
 	checkers := make([]*Checker, len(backends))
 	for i, b := range backends {
-		checkers[i] = NewChecker(b, strategy, healthConfig, logger)
+		checkers[i] = NewChecker(b, strategy, config.Health, logger)
 	}
 
 	return &Manager{checkers: checkers, logger: logger}

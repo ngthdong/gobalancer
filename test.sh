@@ -150,7 +150,7 @@ scenario_load() {
         stop_backend 9002
     ) &
 
-    hey -n 5000 -c 200 "$BALANCER_URL"
+    hey -n 5000 -c 500 "$BALANCER_URL"
 }
 
 usage() {

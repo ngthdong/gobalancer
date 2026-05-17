@@ -62,8 +62,6 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 			return nil, fmt.Errorf("no available backends (excluded: %d)", len(excluded))
 		}
 
-		// Rewrite the request URL to point at this backend.
-		// Because http.RoundTripper must not modify the original request
 		reqCopy := req.Clone(req.Context())
 		reqCopy.URL.Host = backend.Addr
 		reqCopy.URL.Scheme = "http"
@@ -77,14 +75,13 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 		backend.TrackConn(-1)
 
 		if err == nil {
-			if rt.cfg.Retries.RetryOn5xx &&
-				isIdempotent(req.Method) &&
+			if rt.cfg.Retries.RetryOn5xx && isIdempotent(req.Method) &&
 				resp.StatusCode >= 500 {
 
-				// Need drain and close the response body before retrying.
-				// The underlying connection is poisoned and will never be returned to the pool.
 				io.Copy(io.Discard, resp.Body)
 				resp.Body.Close()
+
+				rt.recordFailure(backend)
 
 				excluded[backend.Addr] = struct{}{}
 				lastErr = fmt.Errorf("backend returned %d", resp.StatusCode)
@@ -92,7 +89,8 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 				rt.logger.Warn("retrying on 5xx",
 					"backend", backend.Addr,
 					"status", resp.StatusCode,
-					"attempt", attempt)
+					"attempt", attempt,
+				)
 
 				if attempt < maxAttempts {
 					rt.backoff(req.Context(), attempt)
@@ -100,13 +98,18 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 				continue
 			}
 
+			backend.SetHealthy(true)
+
 			if attempt > 1 {
 				rt.logger.Info("retry succeeded",
 					"backend", backend.Addr,
-					"attempt", attempt)
+					"attempt", attempt,
+				)
 			}
 			return resp, nil
 		}
+
+		rt.recordFailure(backend)
 
 		excluded[backend.Addr] = struct{}{}
 		lastErr = err
@@ -115,7 +118,8 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 			"backend", backend.Addr,
 			"attempt", attempt,
 			"max_attempts", maxAttempts,
-			"error", err)
+			"error", err,
+		)
 
 		if attempt < maxAttempts {
 			rt.backoff(req.Context(), attempt)
@@ -126,6 +130,19 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 		maxAttempts, lastErr)
 }
 
+func (rt *RetryingTransport) recordFailure(backend *pool.Backend) {
+	newFailures := backend.IncrementFailures()
+	if newFailures >= int32(rt.cfg.Health.FailureThreshold) {
+		wasHealthy := backend.IsHealthy()
+		backend.SetHealthy(false)
+		if wasHealthy {
+			rt.logger.Warn("backend marked unhealthy by passive check",
+				"backend", backend.Addr,
+				"consecutive_failures", newFailures,
+			)
+		}
+	}
+}
 func isIdempotent(method string) bool {
 	switch method {
 	case http.MethodGet, http.MethodHead,

@@ -30,13 +30,7 @@ func NewChecker(
 	}
 }
 
-// Uses time.NewTicker (not time.Sleep) so cancellation is immediate
-// Runs the first check immediately, not after the first interval
-// Logs state transitions, not every check result
 func (c *Checker) Run(ctx context.Context) {
-	// Check immediately on startup rather than waiting for the first tick.
-	// Without this, backends start healthy (optimistic default) and you
-	// won't discover dead backends until the first interval elapses.
 	c.runCheck(ctx)
 
 	ticker := time.NewTicker(c.cfg.Interval)
@@ -60,34 +54,34 @@ func (c *Checker) runCheck(ctx context.Context) {
 	err := c.strategy.Check(checkCtx, c.backend.Addr)
 
 	wasHealthy := c.backend.IsHealthy()
-	isHealthy := err == nil
 
-	if !isHealthy {
-		failures := c.backend.ConsecutiveFailures() + 1
-		if failures < int32(c.cfg.FailureThreshold) {
-			c.backend.SetHealthy(false)
+	if err != nil {
+		newFailures := c.backend.IncrementFailures()
+
+		if newFailures < int32(c.cfg.FailureThreshold) {
 			c.logger.Debug("health check failed, not yet at threshold",
-				"failures", failures,
+				"failures", newFailures,
 				"threshold", c.cfg.FailureThreshold,
-				"error", err)
+				"error", err,
+			)
 			return
 		}
-	}
 
-	c.backend.SetHealthy(isHealthy)
+		c.backend.SetHealthy(false)
 
-	// Log only on state transitions, not on every check.
-	// Logging every successful check at INFO would flood your log pipeline
-	// at 1 check/10s × 100 backends = 10 log lines/second of noise.
-	if wasHealthy != c.backend.IsHealthy() {
-		if isHealthy {
-			c.logger.Info("backend recovered",
-				"consecutive_failures_before", c.backend.ConsecutiveFailures())
-		} else {
+		if wasHealthy {
 			c.logger.Warn("backend unhealthy",
 				"error", err,
-				"consecutive_failures", c.backend.ConsecutiveFailures())
+				"consecutive_failures", newFailures,
+			)
 		}
+		return
+	}
+
+	c.backend.SetHealthy(true)
+
+	if !wasHealthy {
+		c.logger.Info("backend recovered")
 	} else {
 		c.logger.Debug("health check ok")
 	}

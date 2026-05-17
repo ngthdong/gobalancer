@@ -38,8 +38,6 @@ func (b *Backend) IsHealthy() bool {
 func (b *Backend) SetHealthy(healthy bool) {
 	if healthy {
 		b.consecutiveFailures.Store(0)
-	} else {
-		b.consecutiveFailures.Add(1)
 	}
 	b.healthy.Store(healthy)
 	b.lastChecked.Store(time.Now().UnixNano())
@@ -63,4 +61,8 @@ func (b *Backend) LastChecked() time.Time {
 		return time.Time{}
 	}
 	return time.Unix(0, ns)
+}
+
+func (b *Backend) IncrementFailures() int32 {
+	return b.consecutiveFailures.Add(1)
 }
