@@ -2,14 +2,11 @@ package main
 
 import (
 	"flag"
-	"log"
-	"net/http"
+	"log/slog"
+	"os"
 
-	"github.com/ngthdong/gobalancer/internal/balancer"
 	"github.com/ngthdong/gobalancer/internal/config"
-	"github.com/ngthdong/gobalancer/internal/middleware"
-	"github.com/ngthdong/gobalancer/internal/pool"
-	"github.com/ngthdong/gobalancer/internal/proxy"
+	"github.com/ngthdong/gobalancer/internal/server"
 )
 
 func main() {
@@ -18,44 +15,14 @@ func main() {
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		slog.Error("failed to load config", "path", *cfgPath, "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("starting gobalancer mode=%s listen=%s backends=%v",
-		cfg.Mode, cfg.ListenAddr, cfg.Backends)
+	logger := server.BuildLogger(cfg)
 
-	p := pool.NewBackendPool(cfg.Backends)
-	rr := &balancer.RoundRobin{}
-
-	switch cfg.Mode {
-	case "http":
-		runHTTP(cfg, p, rr)
-	case "tcp":
-		runTCP(cfg, p, rr)
-	default:
-		log.Fatalf("unknown mode: %s", cfg.Mode)
+	if err := server.NewServer(cfg, logger).Run(); err != nil {
+		logger.Error("server exited", "error", err)
+		os.Exit(1)
 	}
-}
-
-func runHTTP(cfg *config.Config, p *pool.BackendPool, b balancer.Balancer) {
-	hp := proxy.NewHTTPProxy(p, b, cfg)
-	handler := middleware.Logging(hp)
-
-	server := &http.Server{
-		Addr:    cfg.ListenAddr,
-		Handler: handler,
-		ReadTimeout:  cfg.Timeouts.Read,
-		WriteTimeout: cfg.Timeouts.Write,
-		IdleTimeout:  cfg.Timeouts.Idle,
-	}
-
-	log.Printf("HTTP proxy listening on %s", cfg.ListenAddr)
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("server: %v", err)
-	}
-}
-
-func runTCP(cfg *config.Config, p *pool.BackendPool, b balancer.Balancer) {
-	tp := proxy.NewTCPProxy(p, b, cfg)
-	tp.ListenAndServe(cfg.ListenAddr)
 }

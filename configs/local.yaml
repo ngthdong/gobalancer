@@ -1,5 +1,6 @@
 listen_addr: ":8008"
 mode: http
+balancer: round_robin
 
 backends:
   - "localhost:9001"
@@ -22,3 +23,8 @@ health:
 log:
   level:  info
   format: text
+
+retries:
+  max_attempts: 3
+  retry_on_5xx: false
+  total_timeout: 15s

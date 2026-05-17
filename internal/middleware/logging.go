@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -32,7 +32,7 @@ func (rr *responseRecorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func Logging(next http.Handler) http.Handler {
+func Logging(next http.Handler, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := newResponseRecorder(w)
@@ -41,14 +41,22 @@ func Logging(next http.Handler) http.Handler {
 
 		backend, _ := r.Context().Value(constant.ContextKeyBackend).(string)
 
-		log.Printf(
-			"method=%s path=%s backend=%s status=%d latency=%s bytes=%d",
-			r.Method,
-			r.URL.Path,
-			backend,
-			rec.statusCode,
-			time.Since(start).Round(time.Microsecond),
-			rec.written,
-		)
+		fields := []any{
+			"method", r.Method,
+			"path", r.URL.Path,
+			"backend", backend,
+			"status", rec.statusCode,
+			"latency", time.Since(start).Round(time.Microsecond).String(),
+			"bytes", rec.written,
+		}
+
+		switch {
+		case rec.statusCode >= 500:
+			logger.Error("request completed", fields...)
+		case rec.statusCode >= 400:
+			logger.Warn("request completed", fields...)
+		default:
+			logger.Info("request completed", fields...)
+		}
 	})
 }

@@ -1,8 +1,8 @@
 package proxy_test
 
 import (
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,76 +15,257 @@ import (
 	"github.com/ngthdong/gobalancer/internal/proxy"
 )
 
-func TestHTTPProxyRoundTrip(t *testing.T) {
-	// Start a real backend HTTP server
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "backend received: %s", r.Host)
-	}))
+func TestHTTPProxy_ForwardsRequest(t *testing.T) {
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(
+			w http.ResponseWriter,
+			r *http.Request,
+		) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("hello from backend"))
+		}),
+	)
 	defer backend.Close()
 
-	// Build the proxy pointing at it
-	p := pool.NewBackendPool([]string{strings.TrimPrefix(backend.URL, "http://")})
-	rr := &balancer.RoundRobin{}
-	cfg := &config.Config{Timeouts: config.TimeoutConfig{
-		Dial: 5 * time.Second, Read: 10 * time.Second, Idle: 30 * time.Second,
-	}}
-	hp := proxy.NewHTTPProxy(p, rr, cfg)
+	p := pool.NewBackendPool([]string{
+		backend.Listener.Addr().String(),
+	})
 
-	proxyServer := httptest.NewServer(hp)
-	defer proxyServer.Close()
+	hp := proxy.NewHTTPProxy(
+		p,
+		&balancer.RoundRobin{},
+		&config.Config{
+			Timeouts: config.TimeoutConfig{
+				Dial: time.Second,
+				Read: time.Second,
+				Idle: 30 * time.Second,
+			},
+			Retries: config.RetryConfig{
+				MaxAttempts:  3,
+				RetryOn5xx:   true,
+				TotalTimeout: 5 * time.Second,
+			},
+		},
+		slog.Default(),
+	)
 
-	resp, err := http.Get(proxyServer.URL + "/anything")
+	server := httptest.NewServer(hp)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL)
 	if err != nil {
-		t.Fatalf("request failed: %v", err)
+		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("want 200, got %d", resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "backend received") {
-		t.Errorf("unexpected body: %s", body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("got %d want 200", resp.StatusCode)
+	}
+
+	if string(body) != "hello from backend" {
+		t.Fatalf("got %q", body)
 	}
 }
 
-func TestHostHeaderRewrite(t *testing.T) {
-	var receivedHost string
+func TestHTTPProxy_RetriesFailedBackend(t *testing.T) {
+	healthy := httptest.NewServer(
+		http.HandlerFunc(func(
+			w http.ResponseWriter,
+			r *http.Request,
+		) {
+			w.Write([]byte("healthy backend"))
+		}),
+	)
+	defer healthy.Close()
 
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedHost = r.Host
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer backend.Close()
+	p := pool.NewBackendPool([]string{
+		"127.0.0.1:19999",
+		healthy.Listener.Addr().String(),
+	})
 
-	backendAddr := strings.TrimPrefix(backend.URL, "http://")
-
-	p := pool.NewBackendPool([]string{backendAddr})
-	rr := &balancer.RoundRobin{}
-
-	cfg := &config.Config{
-		Timeouts: config.TimeoutConfig{
-			Dial: 5 * time.Second,
-			Read: 10 * time.Second,
-			Idle: 30 * time.Second,
+	hp := proxy.NewHTTPProxy(
+		p,
+		&balancer.RoundRobin{},
+		&config.Config{
+			Timeouts: config.TimeoutConfig{
+				Dial: 500 * time.Millisecond,
+				Read: time.Second,
+				Idle: 30 * time.Second,
+			},
+			Retries: config.RetryConfig{
+				MaxAttempts:  3,
+				RetryOn5xx:   true,
+				TotalTimeout: 5 * time.Second,
+			},
 		},
-	}
+		slog.Default(),
+	)
 
-	hp := proxy.NewHTTPProxy(p, rr, cfg)
+	server := httptest.NewServer(hp)
+	defer server.Close()
 
-	proxyServer := httptest.NewServer(hp)
-	defer proxyServer.Close()
-
-	resp, err := http.Get(proxyServer.URL + "/hello")
+	resp, err := http.Get(server.URL)
 	if err != nil {
-		t.Fatalf("request failed: %v", err)
+		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 
-	if receivedHost != backendAddr {
-		t.Errorf("backend received Host: %q, want %q",
-			receivedHost,
-			backendAddr,
-		)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(body) != "healthy backend" {
+		t.Fatalf("got %q", body)
+	}
+}
+
+func TestHTTPProxy_Returns502WhenAllBackendsFail(t *testing.T) {
+	p := pool.NewBackendPool([]string{
+		"127.0.0.1:19001",
+		"127.0.0.1:19002",
+	})
+
+	hp := proxy.NewHTTPProxy(
+		p,
+		&balancer.RoundRobin{},
+		&config.Config{
+			Timeouts: config.TimeoutConfig{
+				Dial: 200 * time.Millisecond,
+				Read: time.Second,
+				Idle: 30 * time.Second,
+			},
+			Retries: config.RetryConfig{
+				MaxAttempts:  2,
+				RetryOn5xx:   true,
+				TotalTimeout: time.Second,
+			},
+		},
+		slog.Default(),
+	)
+
+	server := httptest.NewServer(hp)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("got %d want 502", resp.StatusCode)
+	}
+}
+
+func TestHTTPProxy_AddsXForwardedFor(t *testing.T) {
+	var forwardedFor string
+
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(
+			w http.ResponseWriter,
+			r *http.Request,
+		) {
+			forwardedFor = r.Header.Get("X-Forwarded-For")
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer backend.Close()
+
+	p := pool.NewBackendPool([]string{
+		backend.Listener.Addr().String(),
+	})
+
+	hp := proxy.NewHTTPProxy(
+		p,
+		&balancer.RoundRobin{},
+		&config.Config{
+			Timeouts: config.TimeoutConfig{
+				Dial: time.Second,
+				Read: time.Second,
+				Idle: 30 * time.Second,
+			},
+			Retries: config.RetryConfig{
+				MaxAttempts:  2,
+				RetryOn5xx:   true,
+				TotalTimeout: 5 * time.Second,
+			},
+		},
+		slog.Default(),
+	)
+
+	server := httptest.NewServer(hp)
+	defer server.Close()
+
+	_, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if forwardedFor == "" {
+		t.Fatal("expected X-Forwarded-For header")
+	}
+}
+
+func TestHTTPProxy_DoesNotOverrideXForwardedFor(t *testing.T) {
+	var forwardedFor string
+
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			forwardedFor = r.Header.Get("X-Forwarded-For")
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+	defer backend.Close()
+
+	p := pool.NewBackendPool([]string{backend.Listener.Addr().String()})
+	hp := proxy.NewHTTPProxy(
+		p,
+		&balancer.RoundRobin{},
+		&config.Config{
+			Timeouts: config.TimeoutConfig{
+				Dial: time.Second,
+				Read: time.Second,
+				Idle: 30 * time.Second,
+			},
+			Retries: config.RetryConfig{
+				MaxAttempts:  2,
+				RetryOn5xx:   true,
+				TotalTimeout: 5 * time.Second,
+			},
+		},
+		slog.Default(),
+	)
+
+	server := httptest.NewServer(hp)
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Forwarded-For", "1.2.3.4")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	// httputil.ReverseProxy correctly appends the connecting client IP
+	// to any existing X-Forwarded-For value — RFC 7239 compliant.
+	// The original IP must be preserved at the start of the chain.
+	if !strings.HasPrefix(forwardedFor, "1.2.3.4") {
+		t.Fatalf("original IP lost from X-Forwarded-For chain: got %q", forwardedFor)
+	}
+
+	// The proxy must have appended its own hop — value should not be unchanged.
+	if forwardedFor == "1.2.3.4" {
+		t.Fatalf("proxy should have appended a hop, got only %q", forwardedFor)
 	}
 }

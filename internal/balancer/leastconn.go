@@ -1,4 +1,3 @@
-// balancer/leastconn.go
 package balancer
 
 import (
@@ -25,4 +24,26 @@ func (lc *LeastConnections) Next(backends []*pool.Backend) *pool.Backend {
 	}
 
 	return best
+}
+
+func (lc *LeastConnections) NextExcluding(
+    backends []*pool.Backend,
+    exclude map[string]struct{},
+) *pool.Backend {
+    var best *pool.Backend
+    bestConns := int64(math.MaxInt64)
+
+    for _, b := range backends {
+        if !b.IsHealthy() {
+            continue
+        }
+        if _, excluded := exclude[b.Addr]; excluded {
+            continue
+        }
+        if conns := b.ActiveConns(); conns < bestConns {
+            bestConns = conns
+            best = b
+        }
+    }
+    return best
 }

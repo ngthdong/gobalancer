@@ -11,10 +11,18 @@ import (
 type Config struct {
 	ListenAddr string        `yaml:"listen_addr"`
 	Mode       string        `yaml:"mode"`
+	Balancer   string        `yaml:"balancer"`
 	Backends   []string      `yaml:"backends"`
 	Timeouts   TimeoutConfig `yaml:"timeouts"`
 	Health     HealthConfig  `yaml:"health"`
 	Log        LogConfig     `yaml:"log"`
+	Retries    RetryConfig   `yaml:"retries"`
+}
+
+type RetryConfig struct {
+	MaxAttempts  int           `yaml:"max_attempts"`
+	RetryOn5xx   bool          `yaml:"retry_on_5xx"`
+	TotalTimeout time.Duration `yaml:"total_timeout"`
 }
 
 type TimeoutConfig struct {
@@ -84,6 +92,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Health.Timeout == 0 {
 		c.Health.Timeout = 2 * time.Second
+	}
+	if c.Retries.MaxAttempts == 0 {
+		c.Retries.MaxAttempts = 3
+	}
+	if c.Retries.TotalTimeout == 0 {
+		c.Retries.TotalTimeout = 15 * time.Second
+	}
+	if c.Balancer == "" {
+		c.Balancer = "round_robin"
 	}
 	if c.Health.Path == "" {
 		c.Health.Path = "/health"

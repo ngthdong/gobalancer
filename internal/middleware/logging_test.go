@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,23 +14,33 @@ import (
 	"github.com/ngthdong/gobalancer/internal/middleware"
 )
 
+func newTestLogger(buf *bytes.Buffer) *slog.Logger {
+	handler := slog.NewTextHandler(buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+
+	return slog.New(handler)
+}
+
 func TestLoggingMiddlewareStatus(t *testing.T) {
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})
 
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	logger := newTestLogger(&buf)
 
-	handler := middleware.Logging(inner)
+	handler := middleware.Logging(inner, logger)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/test", nil)
 
 	handler.ServeHTTP(rec, req)
 
-	if !strings.Contains(buf.String(), "status=418") {
-		t.Errorf("log line missing status=418, got: %s", buf.String())
+	logOutput := buf.String()
+
+	if !strings.Contains(logOutput, "status=418") {
+		t.Fatalf("expected status=418 in log, got: %s", logOutput)
 	}
 }
 
@@ -40,17 +50,19 @@ func TestLoggingMiddlewareDefaultStatusOK(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	logger := newTestLogger(&buf)
 
-	handler := middleware.Logging(inner)
+	handler := middleware.Logging(inner, logger)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/hello", nil)
 
 	handler.ServeHTTP(rec, req)
 
-	if !strings.Contains(buf.String(), "status=200") {
-		t.Errorf("log line missing status=200, got: %s", buf.String())
+	logOutput := buf.String()
+
+	if !strings.Contains(logOutput, "status=200") {
+		t.Fatalf("expected status=200 in log, got: %s", logOutput)
 	}
 }
 
@@ -62,22 +74,19 @@ func TestLoggingMiddlewareBytesWritten(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	logger := newTestLogger(&buf)
 
-	handler := middleware.Logging(inner)
+	handler := middleware.Logging(inner, logger)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/bytes", nil)
 
 	handler.ServeHTTP(rec, req)
 
-	expected := "bytes=11"
+	logOutput := buf.String()
 
-	if !strings.Contains(buf.String(), expected) {
-		t.Errorf("log line missing %s, got: %s",
-			expected,
-			buf.String(),
-		)
+	if !strings.Contains(logOutput, "bytes=11") {
+		t.Fatalf("expected bytes=11 in log, got: %s", logOutput)
 	}
 }
 
@@ -87,9 +96,9 @@ func TestLoggingMiddlewareBackendField(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	logger := newTestLogger(&buf)
 
-	handler := middleware.Logging(inner)
+	handler := middleware.Logging(inner, logger)
 
 	rec := httptest.NewRecorder()
 
@@ -105,8 +114,10 @@ func TestLoggingMiddlewareBackendField(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if !strings.Contains(buf.String(), "backend=backend-1:8080") {
-		t.Errorf("backend field missing in log: %s", buf.String())
+	logOutput := buf.String()
+
+	if !strings.Contains(logOutput, "backend=backend-1:8080") {
+		t.Fatalf("expected backend field in log, got: %s", logOutput)
 	}
 }
 
@@ -117,7 +128,10 @@ func TestLoggingMiddlewarePreservesResponse(t *testing.T) {
 		io.WriteString(w, expectedBody)
 	})
 
-	handler := middleware.Logging(inner)
+	var buf bytes.Buffer
+	logger := newTestLogger(&buf)
+
+	handler := middleware.Logging(inner, logger)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/", nil)
@@ -125,7 +139,8 @@ func TestLoggingMiddlewarePreservesResponse(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Body.String() != expectedBody {
-		t.Errorf("want body %q, got %q",
+		t.Fatalf(
+			"expected body %q, got %q",
 			expectedBody,
 			rec.Body.String(),
 		)
