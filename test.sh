@@ -1,8 +1,15 @@
-set -e
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 PID_DIR="/tmp/gobalancer-demo"
+BALANCER_URL="http://localhost:8008"
 
 mkdir -p "$PID_DIR"
+
+log() {
+    echo "$@"
+}
 
 start_backend() {
     local port=$1
@@ -11,24 +18,54 @@ start_backend() {
 
     echo $! >"$PID_DIR/backend-$port.pid"
 
-    echo "started backend :$port"
+    log "started backend :$port"
+}
+
+start_hung_backend() {
+    local port=$1
+
+    socat TCP-LISTEN:"$port",fork PIPE >/dev/null 2>&1 &
+
+    echo $! >"$PID_DIR/backend-$port.pid"
+
+    log "started hung backend :$port"
+}
+
+start_500_backend() {
+    local port=$1
+
+    python3 -c "
+import http.server
+import socketserver
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(500)
+        self.end_headers()
+        self.wfile.write(b'error')
+
+    def log_message(self, *args):
+        pass
+
+with socketserver.TCPServer(('', $port), Handler) as server:
+    server.serve_forever()
+" >/dev/null 2>&1 &
+
+    echo $! >"$PID_DIR/backend-$port.pid"
+
+    log "started always-500 backend :$port"
 }
 
 stop_backend() {
     local port=$1
+    local pid_file="$PID_DIR/backend-$port.pid"
 
-    if [ -f "$PID_DIR/backend-$port.pid" ]; then
-        kill "$(cat "$PID_DIR/backend-$port.pid")" 2>/dev/null || true
-        rm -f "$PID_DIR/backend-$port.pid"
+    if [[ -f "$pid_file" ]]; then
+        kill "$(cat "$pid_file")" 2>/dev/null || true
+        rm -f "$pid_file"
 
-        echo "stopped backend :$port"
+        log "stopped backend :$port"
     fi
-}
-
-stop_all() {
-    stop_backend 9001
-    stop_backend 9002
-    stop_backend 9003
 }
 
 start_all() {
@@ -37,81 +74,67 @@ start_all() {
     start_backend 9003
 }
 
+stop_all() {
+    stop_backend 9001
+    stop_backend 9002
+    stop_backend 9003
+}
+
+request() {
+    curl -v "$BALANCER_URL"
+}
+
 scenario_basic() {
-    echo "=== basic retry scenario ==="
+    log "running basic retry scenario"
 
     stop_all
 
     start_backend 9001
     start_backend 9002
 
-    echo "backend :9003 intentionally down"
+    log "backend :9003 is down"
 
     sleep 1
 
-    curl -v http://localhost:8008/
+    request
 }
 
 scenario_all_down() {
-    echo "=== all backends down ==="
+    log "running all-backends-down scenario"
 
     stop_all
 
-    curl -v http://localhost:8008/
+    request
 }
 
 scenario_timeout() {
-    echo "=== timeout retry scenario ==="
+    log "running timeout retry scenario"
 
     stop_all
 
-    socat TCP-LISTEN:9001,fork PIPE >/dev/null 2>&1 &
-    echo $! >"$PID_DIR/backend-9001.pid"
-
-    echo "started hung backend :9001"
-
+    start_hung_backend 9001
     start_backend 9002
 
     sleep 1
 
-    time curl -v http://localhost:8008/
+    time request
 }
 
 scenario_5xx() {
-    echo "=== retry on 5xx scenario ==="
+    log "running retry-on-5xx scenario"
 
     stop_all
 
-    python3 -c "
-import http.server
-import socketserver
-
-class H(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(500)
-        self.end_headers()
-        self.wfile.write(b'error')
-
-    def log_message(self, *a):
-        pass
-
-with socketserver.TCPServer(('', 9001), H) as s:
-    s.serve_forever()
-" >/dev/null 2>&1 &
-
-    echo $! >"$PID_DIR/backend-9001.pid"
-
-    echo "started always-500 backend :9001"
-
+    start_500_backend 9001
     start_backend 9002
 
     sleep 1
 
-    curl -v http://localhost:8008/
+    request
 }
 
 scenario_load() {
-    echo "=== load test with backend failure ==="
+    log "running load test scenario"
 
     stop_all
 
@@ -122,26 +145,25 @@ scenario_load() {
     (
         sleep 2
 
-        echo
-        echo ">>> killing backend :9002 during load"
+        log "stopping backend :9002 during load"
 
         stop_backend 9002
     ) &
 
-    hey -n 300 -c 30 http://localhost:8008/
+    hey -n 5000 -c 200 "$BALANCER_URL"
 }
 
 usage() {
-    echo
-    echo "usage:"
-    echo "  ./scripts/retry_demo.sh basic"
-    echo "  ./scripts/retry_demo.sh all-down"
-    echo "  ./scripts/retry_demo.sh timeout"
-    echo "  ./scripts/retry_demo.sh 5xx"
-    echo "  ./scripts/retry_demo.sh load"
-    echo "  ./scripts/retry_demo.sh start"
-    echo "  ./scripts/retry_demo.sh stop"
-    echo
+    cat <<EOF
+usage:
+  ./test.sh basic
+  ./test.sh all-down
+  ./test.sh timeout
+  ./test.sh 5xx
+  ./test.sh load
+  ./test.sh start
+  ./test.sh stop
+EOF
 }
 
 case "${1:-}" in
