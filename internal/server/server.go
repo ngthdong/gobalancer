@@ -8,6 +8,7 @@ import (
 
 	"github.com/ngthdong/gobalancer/internal/balancer"
 	"github.com/ngthdong/gobalancer/internal/config"
+	"github.com/ngthdong/gobalancer/internal/conntrack"
 	"github.com/ngthdong/gobalancer/internal/health"
 	"github.com/ngthdong/gobalancer/internal/metrics"
 	"github.com/ngthdong/gobalancer/internal/middleware"
@@ -87,7 +88,8 @@ func (s *Server) runHTTP() error {
 
 func (s *Server) runTCP() error {
 	b := s.newBalancer()
-	tp := proxy.NewTCPProxy(s.pool, b, s.cfg, s.logger)
+	tracker := conntrack.NewTracker()
+	tp := proxy.NewTCPProxy(s.pool, b, s.cfg, s.logger, tracker)
 
 	s.logger.Info("TCP proxy listening", "addr", s.cfg.ListenAddr)
 	return tp.ListenAndServe(s.cfg.ListenAddr)

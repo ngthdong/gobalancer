@@ -12,6 +12,7 @@ import (
 
 	"github.com/ngthdong/gobalancer/internal/balancer"
 	"github.com/ngthdong/gobalancer/internal/config"
+	"github.com/ngthdong/gobalancer/internal/conntrack"
 	"github.com/ngthdong/gobalancer/internal/pool"
 	"github.com/ngthdong/gobalancer/internal/proxy"
 )
@@ -39,6 +40,8 @@ func TestTCPProxy_ForwardsBytes(t *testing.T) {
 
 	p := pool.NewBackendPool([]string{backendLn.Addr().String()})
 
+	tracker := conntrack.NewTracker()
+
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
@@ -52,6 +55,7 @@ func TestTCPProxy_ForwardsBytes(t *testing.T) {
 			},
 		},
 		slog.Default(),
+		tracker,
 	)
 
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
@@ -123,6 +127,8 @@ func TestTCPProxy_RetriesDeadBackend(t *testing.T) {
 		aliveLn.Addr().String(),
 	})
 
+	tracker := conntrack.NewTracker()
+
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
@@ -136,6 +142,7 @@ func TestTCPProxy_RetriesDeadBackend(t *testing.T) {
 			},
 		},
 		slog.Default(),
+		tracker,
 	)
 
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
@@ -184,6 +191,8 @@ func TestTCPProxy_ExhaustsAllBackends(t *testing.T) {
 		"127.0.0.1:19002",
 	})
 
+	tracker := conntrack.NewTracker()
+
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
@@ -197,6 +206,7 @@ func TestTCPProxy_ExhaustsAllBackends(t *testing.T) {
 			},
 		},
 		slog.Default(),
+		tracker,
 	)
 
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")
@@ -255,6 +265,8 @@ func TestTCPProxy_ConcurrentConnections(t *testing.T) {
 
 	p := pool.NewBackendPool([]string{backendLn.Addr().String()})
 
+	tracker := conntrack.NewTracker()
+
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
@@ -268,6 +280,7 @@ func TestTCPProxy_ConcurrentConnections(t *testing.T) {
 			},
 		},
 		slog.Default(),
+		tracker,
 	)
 
 	proxyLn, err := net.Listen("tcp", "127.0.0.1:0")

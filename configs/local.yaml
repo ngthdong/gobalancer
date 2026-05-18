@@ -2,6 +2,7 @@ listen_addr: ":8008"
 metrics_addr: ":9090"
 mode: http
 balancer: round_robin
+max_connections: 10000
 
 backends:
   - "localhost:9001"
