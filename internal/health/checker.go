@@ -73,7 +73,7 @@ func (c *Checker) runCheck(ctx context.Context) {
 
 		if wasHealthy {
 			c.backend.SetHealthy(false)
-			c.updateHealthMetric(false)
+			c.updateHealthMetric(true)
 
 			c.logger.Warn("backend unhealthy",
 				"error", err,
