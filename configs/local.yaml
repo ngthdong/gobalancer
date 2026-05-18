@@ -8,10 +8,10 @@ backends:
   - "localhost:9003"
 
 timeouts:
-  dial:  5s
-  read:  30s
+  dial:  10s
+  read:  20s
   write: 30s
-  idle:  90s
+  idle:  50s
 
 health:
   interval: 5s
@@ -27,4 +27,4 @@ log:
 retries:
   max_attempts: 3
   retry_on_5xx: false
-  total_timeout: 15s
+  total_timeout: 10s

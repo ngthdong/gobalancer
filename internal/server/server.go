@@ -37,7 +37,7 @@ func (s *Server) Run() error {
 
 	ctx := context.Background()
 
-	hm := health.NewManager(s.pool.Backends(),*s.cfg, s.logger)
+	hm := health.NewManager(s.pool.Backends(), *s.cfg, s.logger)
 	hm.Start(ctx)
 
 	switch s.cfg.Mode {
