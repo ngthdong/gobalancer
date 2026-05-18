@@ -67,9 +67,9 @@ func (c *Checker) runCheck(ctx context.Context) {
 			return
 		}
 
-		c.backend.SetHealthy(false)
-
 		if wasHealthy {
+			c.backend.SetHealthy(false)
+
 			c.logger.Warn("backend unhealthy",
 				"error", err,
 				"consecutive_failures", newFailures,
@@ -78,11 +78,12 @@ func (c *Checker) runCheck(ctx context.Context) {
 		return
 	}
 
-	c.backend.SetHealthy(true)
-
 	if !wasHealthy {
+		c.backend.SetHealthy(true)
+		
 		c.logger.Info("backend recovered")
-	} else {
-		c.logger.Debug("health check ok")
+		return
 	}
+	
+	c.logger.Debug("health check ok")
 }

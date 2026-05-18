@@ -140,7 +140,7 @@ scenario_load() {
 
     start_all
 
-    sleep 1
+    sleep 5
 
     (
         sleep 2
@@ -150,7 +150,7 @@ scenario_load() {
         stop_backend 9002
     ) &
 
-    hey -n 5000 -c 500 "$BALANCER_URL"
+    hey -z 5m -c 1000 "$BALANCER_URL"
 }
 
 usage() {
