@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ngthdong/gobalancer/internal/config"
+	"github.com/ngthdong/gobalancer/internal/metrics"
 	"github.com/ngthdong/gobalancer/internal/pool"
 )
 
@@ -16,6 +17,7 @@ type Manager struct {
 
 func NewManager(
 	backends []*pool.Backend,
+	m *metrics.Metrics,
 	config config.Config,
 	logger *slog.Logger,
 ) *Manager {
@@ -28,7 +30,7 @@ func NewManager(
 
 	checkers := make([]*Checker, len(backends))
 	for i, b := range backends {
-		checkers[i] = NewChecker(b, strategy, config.Health, logger)
+		checkers[i] = NewChecker(b, m, strategy, config.Health, logger)
 	}
 
 	return &Manager{checkers: checkers, logger: logger}

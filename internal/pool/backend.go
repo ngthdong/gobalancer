@@ -3,6 +3,8 @@ package pool
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/ngthdong/gobalancer/internal/metrics"
 )
 
 // Backend represents a single upstream server.
@@ -16,6 +18,7 @@ const (
 
 type Backend struct {
 	Addr                string
+	metrics             *metrics.Metrics
 	healthy             atomic.Bool
 	activeConns         atomic.Int64
 	state               atomic.Int32
@@ -45,6 +48,9 @@ func (b *Backend) SetHealthy(healthy bool) {
 
 func (b *Backend) TrackConn(delta int64) {
 	b.activeConns.Add(delta)
+	if b.metrics != nil {
+		b.metrics.ActiveConnections.WithLabelValues(b.Addr).Add(float64(delta))
+	}
 }
 
 func (b *Backend) ActiveConns() int64 {

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/http"
@@ -9,11 +10,17 @@ import (
 
 	"github.com/ngthdong/gobalancer/internal/balancer"
 	"github.com/ngthdong/gobalancer/internal/config"
+	"github.com/ngthdong/gobalancer/internal/constant"
 	"github.com/ngthdong/gobalancer/internal/pool"
 )
 
 type HTTPProxy struct {
 	rp *httputil.ReverseProxy
+}
+
+type backendResponseWriter struct {
+	http.ResponseWriter
+	backend *string
 }
 
 func NewHTTPProxy(
@@ -56,5 +63,26 @@ func NewHTTPProxy(
 }
 
 func (hp *HTTPProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	hp.rp.ServeHTTP(w, r)
+	carrier := &constant.BackendCarrier{}
+	ctx := context.WithValue(r.Context(), constant.ContextKeyBackend, carrier)
+
+	brw := &backendResponseWriter{
+		ResponseWriter: w,
+		backend:        &carrier.Addr,
+	}
+
+	r = r.WithContext(ctx)
+
+	hp.rp.ServeHTTP(brw, r)
+
+	if carrier.Addr != "" && w.Header().Get("X-Backend") == "" {
+		w.Header().Set("X-Backend", carrier.Addr)
+	}
+}
+
+func (brw *backendResponseWriter) Write(b []byte) (int, error) {
+	if *brw.backend != "" && brw.ResponseWriter.Header().Get("X-Backend") == "" {
+		brw.ResponseWriter.Header().Set("X-Backend", *brw.backend)
+	}
+	return brw.ResponseWriter.Write(b)
 }

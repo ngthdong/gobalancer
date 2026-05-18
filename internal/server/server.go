@@ -9,22 +9,37 @@ import (
 	"github.com/ngthdong/gobalancer/internal/balancer"
 	"github.com/ngthdong/gobalancer/internal/config"
 	"github.com/ngthdong/gobalancer/internal/health"
+	"github.com/ngthdong/gobalancer/internal/metrics"
 	"github.com/ngthdong/gobalancer/internal/middleware"
 	"github.com/ngthdong/gobalancer/internal/pool"
 	"github.com/ngthdong/gobalancer/internal/proxy"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 type Server struct {
-	cfg    *config.Config
-	pool   *pool.BackendPool
-	logger *slog.Logger
+	cfg     *config.Config
+	pool    *pool.BackendPool
+	logger  *slog.Logger
+	metrics *metrics.Metrics
+	reg     *prometheus.Registry
 }
 
 func NewServer(cfg *config.Config, logger *slog.Logger) *Server {
+	reg := prometheus.NewRegistry()
+
+	reg.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+
 	return &Server{
-		cfg:    cfg,
-		pool:   pool.NewBackendPool(cfg.Backends),
-		logger: logger,
+		cfg:     cfg,
+		pool:    pool.NewBackendPool(cfg.Backends),
+		logger:  logger,
+		metrics: metrics.New(reg),
+		reg:     reg,
 	}
 }
 
@@ -37,8 +52,11 @@ func (s *Server) Run() error {
 
 	ctx := context.Background()
 
-	hm := health.NewManager(s.pool.Backends(), *s.cfg, s.logger)
+	hm := health.NewManager(s.pool.Backends(), s.metrics, *s.cfg, s.logger)
 	hm.Start(ctx)
+
+	metricsServer := NewMetricsServer(s.cfg.MetricsAddr, s.reg, s.logger)
+	metricsServer.Start(ctx)
 
 	switch s.cfg.Mode {
 	case "http":
@@ -53,7 +71,7 @@ func (s *Server) Run() error {
 func (s *Server) runHTTP() error {
 	b := s.newBalancer()
 	hp := proxy.NewHTTPProxy(s.pool, b, s.cfg, s.logger)
-	handler := middleware.Logging(hp, s.logger)
+	handler := middleware.Logging(middleware.Metrics(hp, s.metrics), s.logger)
 
 	srv := &http.Server{
 		Addr:         s.cfg.ListenAddr,

@@ -4,8 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/ngthdong/gobalancer/internal/constant"
 )
 
 type responseRecorder struct {
@@ -39,7 +37,7 @@ func Logging(next http.Handler, logger *slog.Logger) http.Handler {
 
 		next.ServeHTTP(rec, r)
 
-		backend, _ := r.Context().Value(constant.ContextKeyBackend).(string)
+		backend := rec.Header().Get("X-Backend")
 
 		fields := []any{
 			"method", r.Method,

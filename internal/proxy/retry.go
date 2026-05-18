@@ -67,8 +67,9 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 		reqCopy.URL.Scheme = "http"
 		reqCopy.Host = backend.Addr
 
-		ctx := context.WithValue(reqCopy.Context(), constant.ContextKeyBackend, backend.Addr)
-		reqCopy = reqCopy.WithContext(ctx)
+		if carrier, ok := req.Context().Value(constant.ContextKeyBackend).(*constant.BackendCarrier); ok {
+			carrier.Addr = backend.Addr
+		}
 
 		backend.TrackConn(+1)
 		resp, err := rt.inner.RoundTrip(reqCopy)

@@ -2,7 +2,6 @@ package middleware_test
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ngthdong/gobalancer/internal/constant"
 	"github.com/ngthdong/gobalancer/internal/middleware"
 )
 
@@ -92,6 +90,7 @@ func TestLoggingMiddlewareBytesWritten(t *testing.T) {
 
 func TestLoggingMiddlewareBackendField(t *testing.T) {
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Backend", "backend-1:8080")
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -101,16 +100,7 @@ func TestLoggingMiddlewareBackendField(t *testing.T) {
 	handler := middleware.Logging(inner, logger)
 
 	rec := httptest.NewRecorder()
-
 	req := httptest.NewRequest("GET", "/backend", nil)
-
-	ctx := context.WithValue(
-		req.Context(),
-		constant.ContextKeyBackend,
-		"backend-1:8080",
-	)
-
-	req = req.WithContext(ctx)
 
 	handler.ServeHTTP(rec, req)
 

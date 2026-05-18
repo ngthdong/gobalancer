@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	ListenAddr string        `yaml:"listen_addr"`
-	Mode       string        `yaml:"mode"`
-	Balancer   string        `yaml:"balancer"`
-	Backends   []string      `yaml:"backends"`
-	Timeouts   TimeoutConfig `yaml:"timeouts"`
-	Health     HealthConfig  `yaml:"health"`
-	Log        LogConfig     `yaml:"log"`
-	Retries    RetryConfig   `yaml:"retries"`
+	ListenAddr  string        `yaml:"listen_addr"`
+	MetricsAddr string        `yaml:"metrics_addr"`
+	Mode        string        `yaml:"mode"`
+	Balancer    string        `yaml:"balancer"`
+	Backends    []string      `yaml:"backends"`
+	Timeouts    TimeoutConfig `yaml:"timeouts"`
+	Health      HealthConfig  `yaml:"health"`
+	Log         LogConfig     `yaml:"log"`
+	Retries     RetryConfig   `yaml:"retries"`
 }
 
 type RetryConfig struct {
@@ -98,6 +99,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Retries.TotalTimeout == 0 {
 		c.Retries.TotalTimeout = 15 * time.Second
+	}
+	if c.MetricsAddr == "" {
+		c.MetricsAddr = ":9090"
 	}
 	if c.Balancer == "" {
 		c.Balancer = "round_robin"

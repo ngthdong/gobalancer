@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/ngthdong/gobalancer/internal/config"
+	"github.com/ngthdong/gobalancer/internal/metrics"
 	"github.com/ngthdong/gobalancer/internal/pool"
 )
 
 type Checker struct {
 	backend  *pool.Backend
+	metrics  *metrics.Metrics
 	strategy CheckStrategy
 	cfg      config.HealthConfig
 	logger   *slog.Logger
@@ -18,12 +20,14 @@ type Checker struct {
 
 func NewChecker(
 	b *pool.Backend,
+	m *metrics.Metrics,
 	strategy CheckStrategy,
 	cfg config.HealthConfig,
 	logger *slog.Logger,
 ) *Checker {
 	return &Checker{
 		backend:  b,
+		metrics:  m,
 		strategy: strategy,
 		cfg:      cfg,
 		logger:   logger.With("backend", b.Addr),
@@ -69,6 +73,7 @@ func (c *Checker) runCheck(ctx context.Context) {
 
 		if wasHealthy {
 			c.backend.SetHealthy(false)
+			c.updateHealthMetric(false)
 
 			c.logger.Warn("backend unhealthy",
 				"error", err,
@@ -80,10 +85,22 @@ func (c *Checker) runCheck(ctx context.Context) {
 
 	if !wasHealthy {
 		c.backend.SetHealthy(true)
+		c.updateHealthMetric(true)
 
 		c.logger.Info("backend recovered")
 		return
 	}
 
 	c.logger.Debug("health check ok")
+}
+
+func (c *Checker) updateHealthMetric(healthy bool) {
+	if c.metrics == nil {
+		return
+	}
+	v := 0.0
+	if healthy {
+		v = 1.0
+	}
+	c.metrics.BackendHealthy.WithLabelValues(c.backend.Addr).Set(v)
 }
