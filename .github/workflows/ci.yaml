@@ -21,8 +21,8 @@ jobs:
         run: go mod download
 
       - name: Verify formatting
-        run: test -z "$(gofmt -l .)"
-
+        run: test -z "$(find . -path ./vendor -prune -o -name '*.go' -exec gofmt -l {} +)"
+        
       - name: Run go vet
         run: go vet ./...
 
