@@ -91,7 +91,6 @@ func (p *BackendPool) Drain(ctx context.Context, addr string, logger *slog.Logge
 func (p *BackendPool) remove(addr string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
 	filtered := p.backends[:0]
 	for _, b := range p.backends {
 		if b.Addr != addr {
@@ -105,4 +104,26 @@ func (p *BackendPool) Size() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return len(p.backends)
+}
+
+func (p *BackendPool) BackendAddrs() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	addrs := make([]string, len(p.backends))
+	for i, b := range p.backends {
+		addrs[i] = b.Addr
+	}
+	return addrs
+}
+
+func (p *BackendPool) Add(newBackend *Backend) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	currentBackendAddrs := p.BackendAddrs()
+	for _, addr := range currentBackendAddrs {
+		if addr == newBackend.Addr {
+			return
+		}
+	}
+	p.backends = append(p.backends, newBackend)
 }

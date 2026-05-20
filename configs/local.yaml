@@ -32,16 +32,16 @@ retries:
   total_timeout: 10s
 
 circuit_breaker:
-  enabled:           true
+  enabled:           false
   failure_threshold: 5
   success_threshold: 2
   timeout:           30s
 
 sticky_session:
-  enabled:     false
+  enabled:     true
   cookie_name: GOBALANCER_BACKEND
 
 rate_limit:
-  enabled:             true
+  enabled:             false
   requests_per_second: 100
   burst:               200

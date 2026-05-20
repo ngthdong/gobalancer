@@ -323,6 +323,41 @@ scenario_breaker() {
     log "check metrics/logs for breaker=open"
 }
 
+scenario_graceful_shutdown() {
+    log "running graceful shutdown scenario"
+
+    stop_all
+    start_all
+
+    sleep 2
+
+    log "starting load"
+
+    hey -n 10000 -c 50 -q 100 "$BALANCER_URL" &
+    HEY_PID=$!
+
+    sleep 2
+
+    log "sending SIGTERM to gobalancer"
+
+    BALANCER_PID=$(pgrep -f "gobalancer" | head -n1)
+
+    if [[ -z "$BALANCER_PID" ]]; then
+        echo "gobalancer not running"
+        exit 1
+    fi
+
+    kill -SIGTERM "$BALANCER_PID"
+
+    log "waiting for load to finish..."
+
+    wait "$HEY_PID"
+
+    echo
+    log "graceful shutdown test completed"
+    log "check hey output above — Non-2xx responses should be 0"
+}
+
 usage() {
     cat <<EOF
 usage:
@@ -338,6 +373,7 @@ usage:
     ./test.sh ratelimit
     ./test.sh ratelimit-recovery
     ./test.sh breaker
+    ./test.sh graceful
 EOF
 }
 
@@ -381,6 +417,9 @@ ratelimit-recovery)
 
 breaker)
     scenario_breaker
+    ;;
+graceful)
+    scenario_graceful_shutdown
     ;;
 *)
     usage

@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	ConfigPath     string               `yaml:"-"`
 	ListenAddr     string               `yaml:"listen_addr"`
 	MetricsAddr    string               `yaml:"metrics_addr"`
 	Mode           string               `yaml:"mode"`
@@ -84,6 +85,9 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg.applyDefaults()
+
+	cfg.ConfigPath = path
+
 	return &cfg, nil
 }
 
