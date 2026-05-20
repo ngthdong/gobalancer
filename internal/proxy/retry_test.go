@@ -41,22 +41,24 @@ func TestRetryingTransport_RetriesTransportError(t *testing.T) {
 		}, nil
 	})
 
-	p := pool.NewBackendPool([]string{
-		"backend-1",
-		"backend-2",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"backend-1",
+			"backend-2",
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			RetryOn5xx:   true,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	rt := proxy.NewRetryingTransport(
 		inner,
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				RetryOn5xx:   true,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -91,21 +93,23 @@ func TestRetryingTransport_DoesNotRetryPost(t *testing.T) {
 		return nil, errors.New("boom")
 	})
 
-	p := pool.NewBackendPool([]string{
-		"backend-1",
-		"backend-2",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"backend-1",
+			"backend-2",
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  5,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	rt := proxy.NewRetryingTransport(
 		inner,
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Retries: config.RetryConfig{
-				MaxAttempts:  5,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -147,22 +151,24 @@ func TestRetryingTransport_RetriesOn5xx(t *testing.T) {
 		}, nil
 	})
 
-	p := pool.NewBackendPool([]string{
-		"backend-1",
-		"backend-2",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"backend-1",
+			"backend-2",
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			RetryOn5xx:   true,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	rt := proxy.NewRetryingTransport(
 		inner,
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				RetryOn5xx:   true,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -197,22 +203,24 @@ func TestRetryingTransport_ExhaustsAllBackends(t *testing.T) {
 		return nil, errors.New("boom")
 	})
 
-	p := pool.NewBackendPool([]string{
-		"backend-1",
-		"backend-2",
-		"backend-3",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"backend-1",
+			"backend-2",
+			"backend-3",
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  3,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	rt := proxy.NewRetryingTransport(
 		inner,
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Retries: config.RetryConfig{
-				MaxAttempts:  3,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -255,21 +263,23 @@ func TestRetryingTransport_UsesDifferentBackendAfterFailure(t *testing.T) {
 		}, nil
 	})
 
-	p := pool.NewBackendPool([]string{
-		"backend-1",
-		"backend-2",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"backend-1",
+			"backend-2",
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	rt := proxy.NewRetryingTransport(
 		inner,
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 

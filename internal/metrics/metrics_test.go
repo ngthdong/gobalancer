@@ -10,7 +10,7 @@ import (
 
 func TestRequestsCounterIncrements(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	m := metrics.New(reg)
+	m := metrics.NewMetrics(reg)
 
 	m.RequestsTotal.WithLabelValues("localhost:9001", "GET", "200").Inc()
 	m.RequestsTotal.WithLabelValues("localhost:9001", "GET", "200").Inc()
@@ -26,7 +26,7 @@ func TestRequestsCounterIncrements(t *testing.T) {
 
 func TestActiveConnectionsGauge(t *testing.T) {
 	reg := prometheus.NewRegistry()
-	m := metrics.New(reg)
+	m := metrics.NewMetrics(reg)
 
 	m.ActiveConnections.WithLabelValues("localhost:9001").Add(3)
 	m.ActiveConnections.WithLabelValues("localhost:9001").Sub(1)
@@ -40,7 +40,7 @@ func TestActiveConnectionsGauge(t *testing.T) {
 func TestMetricsEndpointReachable(t *testing.T) {
 	// Use testutil.GatherAndCompare for full metric snapshot testing
 	reg := prometheus.NewRegistry()
-	m := metrics.New(reg)
+	m := metrics.NewMetrics(reg)
 
 	m.RequestsTotal.WithLabelValues("b1", "GET", "200").Inc()
 
@@ -58,5 +58,29 @@ func TestMetricsEndpointReachable(t *testing.T) {
 	}
 	if !found {
 		t.Error("gobalancer_requests_total not found in gathered metrics")
+	}
+}
+
+func TestCircuitStateGauge(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	m := metrics.NewMetrics(reg)
+
+	// Test setting circuit state: 0=closed, 1=open, 2=half-open
+	m.CircuitState.WithLabelValues("localhost:9001").Set(0) // closed
+	m.CircuitState.WithLabelValues("localhost:9002").Set(1) // open
+	m.CircuitState.WithLabelValues("localhost:9003").Set(2) // half-open
+
+	v1 := testutil.ToFloat64(m.CircuitState.WithLabelValues("localhost:9001"))
+	v2 := testutil.ToFloat64(m.CircuitState.WithLabelValues("localhost:9002"))
+	v3 := testutil.ToFloat64(m.CircuitState.WithLabelValues("localhost:9003"))
+
+	if v1 != 0 {
+		t.Errorf("localhost:9001 want closed (0), got %v", v1)
+	}
+	if v2 != 1 {
+		t.Errorf("localhost:9002 want open (1), got %v", v2)
+	}
+	if v3 != 2 {
+		t.Errorf("localhost:9003 want half-open (2), got %v", v3)
 	}
 }

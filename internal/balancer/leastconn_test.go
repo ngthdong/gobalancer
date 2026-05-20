@@ -9,9 +9,9 @@ import (
 
 func TestLeastConnPicksLowest(t *testing.T) {
 	backends := []*pool.Backend{
-		pool.NewBackend("a:1"),
-		pool.NewBackend("b:2"),
-		pool.NewBackend("c:3"),
+		pool.NewBackend("a:1", nil),
+		pool.NewBackend("b:2", nil),
+		pool.NewBackend("c:3", nil),
 	}
 	backends[0].TrackConn(10)
 	backends[1].TrackConn(3) // lowest
@@ -26,8 +26,8 @@ func TestLeastConnPicksLowest(t *testing.T) {
 }
 
 func TestLeastConnSkipsUnhealthy(t *testing.T) {
-	healthy := pool.NewBackend("healthy:1")
-	unhealthy := pool.NewBackend("unhealthy:2")
+	healthy := pool.NewBackend("healthy:1", nil)
+	unhealthy := pool.NewBackend("unhealthy:2", nil)
 	unhealthy.SetHealthy(false)
 
 	unhealthy.TrackConn(0)

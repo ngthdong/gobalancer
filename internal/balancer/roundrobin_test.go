@@ -9,9 +9,9 @@ import (
 
 func TestRoundRobinDistribution(t *testing.T) {
 	backends := []*pool.Backend{
-		pool.NewBackend("a:1"),
-		pool.NewBackend("b:2"),
-		pool.NewBackend("c:3"),
+		pool.NewBackend("a:1", nil),
+		pool.NewBackend("b:2", nil),
+		pool.NewBackend("c:3", nil),
 	}
 	rr := &RoundRobin{}
 
@@ -30,8 +30,8 @@ func TestRoundRobinDistribution(t *testing.T) {
 
 func TestRoundRobinConcurrent(t *testing.T) {
 	backends := []*pool.Backend{
-		pool.NewBackend("a:1"),
-		pool.NewBackend("b:2"),
+		pool.NewBackend("a:1", nil),
+		pool.NewBackend("b:2", nil),
 	}
 	rr := &RoundRobin{}
 

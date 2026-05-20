@@ -38,22 +38,24 @@ func TestTCPProxy_ForwardsBytes(t *testing.T) {
 		}
 	}()
 
-	p := pool.NewBackendPool([]string{backendLn.Addr().String()})
+	cfg := &config.Config{
+		Backends: []string{backendLn.Addr().String()},
+		Timeouts: config.TimeoutConfig{
+			Dial: time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  3,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	tracker := conntrack.NewTracker()
 
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  3,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 		tracker,
 	)
@@ -122,25 +124,27 @@ func TestTCPProxy_RetriesDeadBackend(t *testing.T) {
 		}
 	}()
 
-	p := pool.NewBackendPool([]string{
-		"127.0.0.1:19999",
-		aliveLn.Addr().String(),
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"127.0.0.1:19999",
+			aliveLn.Addr().String(),
+		},
+		Timeouts: config.TimeoutConfig{
+			Dial: 500 * time.Millisecond,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  3,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	tracker := conntrack.NewTracker()
 
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: 500 * time.Millisecond,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  3,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 		tracker,
 	)
@@ -186,25 +190,27 @@ func TestTCPProxy_RetriesDeadBackend(t *testing.T) {
 }
 
 func TestTCPProxy_ExhaustsAllBackends(t *testing.T) {
-	p := pool.NewBackendPool([]string{
-		"127.0.0.1:19001",
-		"127.0.0.1:19002",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"127.0.0.1:19001",
+			"127.0.0.1:19002",
+		},
+		Timeouts: config.TimeoutConfig{
+			Dial: 200 * time.Millisecond,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			TotalTimeout: time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	tracker := conntrack.NewTracker()
 
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: 200 * time.Millisecond,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				TotalTimeout: time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 		tracker,
 	)
@@ -263,22 +269,24 @@ func TestTCPProxy_ConcurrentConnections(t *testing.T) {
 		}
 	}()
 
-	p := pool.NewBackendPool([]string{backendLn.Addr().String()})
+	cfg := &config.Config{
+		Backends: []string{backendLn.Addr().String()},
+		Timeouts: config.TimeoutConfig{
+			Dial: time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  3,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	tracker := conntrack.NewTracker()
 
 	tp := proxy.NewTCPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  3,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 		tracker,
 	)

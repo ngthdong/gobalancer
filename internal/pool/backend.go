@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ngthdong/gobalancer/internal/circuit"
+	"github.com/ngthdong/gobalancer/internal/config"
 	"github.com/ngthdong/gobalancer/internal/metrics"
 )
 
@@ -18,6 +20,7 @@ const (
 
 type Backend struct {
 	Addr                string
+	Breaker             *circuit.Breaker
 	metrics             *metrics.Metrics
 	healthy             atomic.Bool
 	activeConns         atomic.Int64
@@ -26,10 +29,13 @@ type Backend struct {
 	lastChecked         atomic.Int64
 }
 
-func NewBackend(addr string) *Backend {
+func NewBackend(addr string, cfg *config.Config) *Backend {
 	b := &Backend{Addr: addr}
 	b.healthy.Store(true)
 	b.state.Store(int32(StateActive))
+	if cfg != nil {
+		b.Breaker = circuit.NewBreaker(cfg)
+	}
 	return b
 }
 
@@ -44,6 +50,16 @@ func (b *Backend) SetHealthy(healthy bool) {
 	}
 	b.healthy.Store(healthy)
 	b.lastChecked.Store(time.Now().UnixNano())
+}
+
+func (b *Backend) IsAvailable() bool {
+	if !b.IsHealthy() {
+		return false
+	}
+	if b.Breaker != nil && !b.Breaker.Allow() {
+		return false
+	}
+	return true
 }
 
 func (b *Backend) TrackConn(delta int64) {

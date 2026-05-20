@@ -27,6 +27,11 @@ type Metrics struct {
 	// alert when gobalancer_backend_healthy == 0
 	BackendHealthy *prometheus.GaugeVec
 
+	// CircuitState tracks the circuit breaker state per backend.
+	// 0 = closed (normal), 1 = open (failing), 2 = half-open (recovering).
+	// Useful for alerting: alert when gobalancer_circuit_state == 1
+	CircuitState *prometheus.GaugeVec
+
 	// RetryTotal counts retry attempts, labelled by backend and reason.
 	// Spikes here indicate backend instability.
 	RetryTotal *prometheus.CounterVec
@@ -39,7 +44,7 @@ type Metrics struct {
 // New creates and registers all metrics with the provided registry.
 // Using a custom registry (not prometheus.DefaultRegisterer) means
 // tests can create isolated registries without "already registered" panics.
-func New(reg prometheus.Registerer) *Metrics {
+func NewMetrics(reg prometheus.Registerer) *Metrics {
 	factory := promauto.With(reg)
 
 	return &Metrics{
@@ -74,6 +79,14 @@ func New(reg prometheus.Registerer) *Metrics {
 			prometheus.GaugeOpts{
 				Name: "gobalancer_backend_healthy",
 				Help: "Current health state of each backend (1=healthy, 0=unhealthy).",
+			},
+			[]string{"backend"},
+		),
+
+		CircuitState: factory.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "gobalancer_circuit_state",
+				Help: "Circuit breaker state per backend (0=closed, 1=open, 2=half-open).",
 			},
 			[]string{"backend"},
 		),

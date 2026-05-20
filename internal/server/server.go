@@ -10,10 +10,12 @@ import (
 	"github.com/ngthdong/gobalancer/internal/config"
 	"github.com/ngthdong/gobalancer/internal/conntrack"
 	"github.com/ngthdong/gobalancer/internal/health"
+	"github.com/ngthdong/gobalancer/internal/limiter"
 	"github.com/ngthdong/gobalancer/internal/metrics"
 	"github.com/ngthdong/gobalancer/internal/middleware"
 	"github.com/ngthdong/gobalancer/internal/pool"
 	"github.com/ngthdong/gobalancer/internal/proxy"
+	"github.com/ngthdong/gobalancer/internal/session"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -37,9 +39,9 @@ func NewServer(cfg *config.Config, logger *slog.Logger) *Server {
 
 	return &Server{
 		cfg:     cfg,
-		pool:    pool.NewBackendPool(cfg.Backends),
+		pool:    pool.NewBackendPool(cfg),
 		logger:  logger,
-		metrics: metrics.New(reg),
+		metrics: metrics.NewMetrics(reg),
 		reg:     reg,
 	}
 }
@@ -72,7 +74,24 @@ func (s *Server) Run() error {
 func (s *Server) runHTTP() error {
 	b := s.newBalancer()
 	hp := proxy.NewHTTPProxy(s.pool, b, s.cfg, s.logger)
-	handler := middleware.Logging(middleware.Metrics(hp, s.metrics), s.logger)
+
+	var handler http.Handler = hp
+
+	if s.cfg.StickySession.Enabled {
+		sticky := session.NewSticky(s.cfg.StickySession.CookieName)
+		handler = middleware.StickySession(handler, sticky, s.pool)
+	}
+
+	if s.cfg.RateLimit.Enabled {
+		rl := limiter.NewRateLimiter(
+			s.cfg.RateLimit.RequestsPerSecond,
+			s.cfg.RateLimit.Burst,
+		)
+		handler = limiter.RateLimit(rl, s.metrics)(handler)
+	}
+
+	handler = middleware.Metrics(handler, s.metrics)
+	handler = middleware.Logging(handler, s.logger)
 
 	srv := &http.Server{
 		Addr:         s.cfg.ListenAddr,
@@ -83,6 +102,11 @@ func (s *Server) runHTTP() error {
 	}
 
 	s.logger.Info("HTTP proxy listening", "addr", s.cfg.ListenAddr)
+	s.logger.Info(
+		"sticky config",
+		"enabled", s.cfg.StickySession.Enabled,
+		"cookie", s.cfg.StickySession.CookieName,
+	)
 	return srv.ListenAndServe()
 }
 

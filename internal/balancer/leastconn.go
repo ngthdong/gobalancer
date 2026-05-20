@@ -13,7 +13,7 @@ func (lc *LeastConnections) Next(backends []*pool.Backend) *pool.Backend {
 	bestConns := int64(math.MaxInt64)
 
 	for _, b := range backends {
-		if !b.IsHealthy() {
+		if !b.IsAvailable() {
 			continue
 		}
 		conns := b.ActiveConns()

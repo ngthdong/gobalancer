@@ -103,4 +103,11 @@ func (c *Checker) updateHealthMetric(healthy bool) {
 		v = 1.0
 	}
 	c.metrics.BackendHealthy.WithLabelValues(c.backend.Addr).Set(v)
+	c.updateCircuitStateMetric()
+}
+
+func (c *Checker) updateCircuitStateMetric() {
+	if c.backend.Breaker != nil && c.metrics != nil {
+		c.metrics.CircuitState.WithLabelValues(c.backend.Addr).Set(float64(c.backend.Breaker.State()))
+	}
 }

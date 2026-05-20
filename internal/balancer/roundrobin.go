@@ -17,7 +17,7 @@ func (rr *RoundRobin) Next(backends []*pool.Backend) *pool.Backend {
 
 	healthy := make([]*pool.Backend, 0, len(backends))
 	for _, b := range backends {
-		if b.IsHealthy() {
+		if b.IsAvailable() {
 			healthy = append(healthy, b)
 		}
 	}

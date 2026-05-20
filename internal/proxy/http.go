@@ -63,15 +63,17 @@ func NewHTTPProxy(
 }
 
 func (hp *HTTPProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	carrier := &constant.BackendCarrier{}
-	ctx := context.WithValue(r.Context(), constant.ContextKeyBackend, carrier)
+	carrier, ok := r.Context().Value(constant.ContextKeyBackend).(*constant.BackendCarrier)
+	if !ok {
+		carrier = &constant.BackendCarrier{}
+		ctx := context.WithValue(r.Context(), constant.ContextKeyBackend, carrier)
+		r = r.WithContext(ctx)
+	}
 
 	brw := &backendResponseWriter{
 		ResponseWriter: w,
 		backend:        &carrier.Addr,
 	}
-
-	r = r.WithContext(ctx)
 
 	hp.rp.ServeHTTP(brw, r)
 

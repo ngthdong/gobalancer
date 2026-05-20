@@ -53,7 +53,17 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		var backend *pool.Backend
 		if attempt == 1 {
-			backend = rt.balancer.Next(backends)
+			if stickyAddr, ok := req.Context().Value(constant.ContextKeyStickyBackend).(string); ok && stickyAddr != "" {
+				for _, b := range backends {
+					if b.Addr == stickyAddr && b.IsAvailable() {
+						backend = b
+						break
+					}
+				}
+			}
+			if backend == nil {
+				backend = rt.balancer.Next(backends)
+			}
 		} else {
 			backend = rt.balancer.NextExcluding(backends, excluded)
 		}
@@ -99,6 +109,9 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 				continue
 			}
 
+			if backend.Breaker != nil {
+				backend.Breaker.RecordSuccess()
+			}
 			backend.SetHealthy(true)
 
 			if attempt > 1 {
@@ -132,6 +145,10 @@ func (rt *RetryingTransport) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 func (rt *RetryingTransport) recordFailure(backend *pool.Backend) {
+	if backend.Breaker != nil {
+		backend.Breaker.RecordFailure()
+	}
+
 	newFailures := backend.IncrementFailures()
 	if newFailures >= int32(rt.cfg.Health.FailureThreshold) {
 		wasHealthy := backend.IsHealthy()

@@ -27,25 +27,25 @@ func TestHTTPProxy_ForwardsRequest(t *testing.T) {
 	)
 	defer backend.Close()
 
-	p := pool.NewBackendPool([]string{
-		backend.Listener.Addr().String(),
-	})
+	cfg := &config.Config{
+		Backends: []string{backend.Listener.Addr().String()},
+		Timeouts: config.TimeoutConfig{
+			Dial: time.Second,
+			Read: time.Second,
+			Idle: 30 * time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  3,
+			RetryOn5xx:   true,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	hp := proxy.NewHTTPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: time.Second,
-				Read: time.Second,
-				Idle: 30 * time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  3,
-				RetryOn5xx:   true,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -83,26 +83,28 @@ func TestHTTPProxy_RetriesFailedBackend(t *testing.T) {
 	)
 	defer healthy.Close()
 
-	p := pool.NewBackendPool([]string{
-		"127.0.0.1:19999",
-		healthy.Listener.Addr().String(),
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"127.0.0.1:19999",
+			healthy.Listener.Addr().String(),
+		},
+		Timeouts: config.TimeoutConfig{
+			Dial: 500 * time.Millisecond,
+			Read: time.Second,
+			Idle: 30 * time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  3,
+			RetryOn5xx:   true,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	hp := proxy.NewHTTPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: 500 * time.Millisecond,
-				Read: time.Second,
-				Idle: 30 * time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  3,
-				RetryOn5xx:   true,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -126,26 +128,28 @@ func TestHTTPProxy_RetriesFailedBackend(t *testing.T) {
 }
 
 func TestHTTPProxy_Returns502WhenAllBackendsFail(t *testing.T) {
-	p := pool.NewBackendPool([]string{
-		"127.0.0.1:19001",
-		"127.0.0.1:19002",
-	})
+	cfg := &config.Config{
+		Backends: []string{
+			"127.0.0.1:19001",
+			"127.0.0.1:19002",
+		},
+		Timeouts: config.TimeoutConfig{
+			Dial: 200 * time.Millisecond,
+			Read: time.Second,
+			Idle: 30 * time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			RetryOn5xx:   true,
+			TotalTimeout: time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	hp := proxy.NewHTTPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: 200 * time.Millisecond,
-				Read: time.Second,
-				Idle: 30 * time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				RetryOn5xx:   true,
-				TotalTimeout: time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -177,25 +181,25 @@ func TestHTTPProxy_AddsXForwardedFor(t *testing.T) {
 	)
 	defer backend.Close()
 
-	p := pool.NewBackendPool([]string{
-		backend.Listener.Addr().String(),
-	})
+	cfg := &config.Config{
+		Backends: []string{backend.Listener.Addr().String()},
+		Timeouts: config.TimeoutConfig{
+			Dial: time.Second,
+			Read: time.Second,
+			Idle: 30 * time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			RetryOn5xx:   true,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 
 	hp := proxy.NewHTTPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: time.Second,
-				Read: time.Second,
-				Idle: 30 * time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				RetryOn5xx:   true,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 
@@ -223,22 +227,24 @@ func TestHTTPProxy_DoesNotOverrideXForwardedFor(t *testing.T) {
 	)
 	defer backend.Close()
 
-	p := pool.NewBackendPool([]string{backend.Listener.Addr().String()})
+	cfg := &config.Config{
+		Backends: []string{backend.Listener.Addr().String()},
+		Timeouts: config.TimeoutConfig{
+			Dial: time.Second,
+			Read: time.Second,
+			Idle: 30 * time.Second,
+		},
+		Retries: config.RetryConfig{
+			MaxAttempts:  2,
+			RetryOn5xx:   true,
+			TotalTimeout: 5 * time.Second,
+		},
+	}
+	p := pool.NewBackendPool(cfg)
 	hp := proxy.NewHTTPProxy(
 		p,
 		&balancer.RoundRobin{},
-		&config.Config{
-			Timeouts: config.TimeoutConfig{
-				Dial: time.Second,
-				Read: time.Second,
-				Idle: 30 * time.Second,
-			},
-			Retries: config.RetryConfig{
-				MaxAttempts:  2,
-				RetryOn5xx:   true,
-				TotalTimeout: 5 * time.Second,
-			},
-		},
+		cfg,
 		slog.Default(),
 	)
 

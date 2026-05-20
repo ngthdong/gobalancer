@@ -9,16 +9,19 @@ import (
 )
 
 type Config struct {
-	ListenAddr     string        `yaml:"listen_addr"`
-	MetricsAddr    string        `yaml:"metrics_addr"`
-	Mode           string        `yaml:"mode"`
-	Balancer       string        `yaml:"balancer"`
-	Backends       []string      `yaml:"backends"`
-	Timeouts       TimeoutConfig `yaml:"timeouts"`
-	Health         HealthConfig  `yaml:"health"`
-	Log            LogConfig     `yaml:"log"`
-	Retries        RetryConfig   `yaml:"retries"`
-	MaxConnections int           `yaml:"max_connections"`
+	ListenAddr     string               `yaml:"listen_addr"`
+	MetricsAddr    string               `yaml:"metrics_addr"`
+	Mode           string               `yaml:"mode"`
+	Balancer       string               `yaml:"balancer"`
+	Backends       []string             `yaml:"backends"`
+	MaxConnections int                  `yaml:"max_connections"`
+	Timeouts       TimeoutConfig        `yaml:"timeouts"`
+	Health         HealthConfig         `yaml:"health"`
+	Log            LogConfig            `yaml:"log"`
+	Retries        RetryConfig          `yaml:"retries"`
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker"`
+	StickySession  StickySessionConfig  `yaml:"sticky_session"`
+	RateLimit      RateLimitConfig      `yaml:"rate_limit"`
 }
 
 type RetryConfig struct {
@@ -45,6 +48,24 @@ type HealthConfig struct {
 type LogConfig struct {
 	Level  string `yaml:"level"`
 	Format string `yaml:"format"`
+}
+
+type CircuitBreakerConfig struct {
+	Enabled          bool          `yaml:"enabled"`
+	FailureThreshold int           `yaml:"failure_threshold"`
+	SuccessThreshold int           `yaml:"success_threshold"`
+	Timeout          time.Duration `yaml:"timeout"`
+}
+
+type StickySessionConfig struct {
+	Enabled    bool   `yaml:"enabled"`
+	CookieName string `yaml:"cookie_name"`
+}
+
+type RateLimitConfig struct {
+	Enabled           bool    `yaml:"enabled"`
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	Burst             float64 `yaml:"burst"`
 }
 
 func Load(path string) (*Config, error) {
@@ -103,6 +124,21 @@ func (c *Config) applyDefaults() {
 	}
 	if c.MaxConnections == 0 {
 		c.MaxConnections = 10000
+	}
+	if c.CircuitBreaker.FailureThreshold == 0 {
+		c.CircuitBreaker.FailureThreshold = 5
+	}
+	if c.CircuitBreaker.Timeout == 0 {
+		c.CircuitBreaker.Timeout = 30 * time.Second
+	}
+	if c.StickySession.CookieName == "" {
+		c.StickySession.CookieName = "GOBALANCER_BACKEND"
+	}
+	if c.RateLimit.RequestsPerSecond == 0 {
+		c.RateLimit.RequestsPerSecond = 100
+	}
+	if c.RateLimit.Burst == 0 {
+		c.RateLimit.Burst = 200
 	}
 	if c.MetricsAddr == "" {
 		c.MetricsAddr = ":9090"

@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/ngthdong/gobalancer/internal/config"
 )
 
 // BackendPool holds the list of upstream backends.
@@ -14,10 +16,11 @@ type BackendPool struct {
 	backends []*Backend
 }
 
-func NewBackendPool(addrs []string) *BackendPool {
-	backends := make([]*Backend, len(addrs))
+func NewBackendPool(cfg *config.Config) *BackendPool {
+	addrs := cfg.Backends
+	backends := make([]*Backend, len(cfg.Backends))
 	for i, addr := range addrs {
-		backends[i] = NewBackend(addr)
+		backends[i] = NewBackend(addr, cfg)
 	}
 	return &BackendPool{backends: backends}
 }
